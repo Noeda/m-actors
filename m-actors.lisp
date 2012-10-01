@@ -315,7 +315,8 @@ causing undefined behaviour."
   queued for 60 seconds to wait until an actor of that name is created.
   When such actor is created, it is not guaranteed that all the messages
   arrive or that they arrive immediately. This behaviour merely makes such
-  occurrence less likely to happen.
+  occurrence less likely to happen. Most notably, if an actor crashes, all
+  the messages currently in its queue are lost in any case.
 
   If there's no actor by that name, this function does nothing.
 
