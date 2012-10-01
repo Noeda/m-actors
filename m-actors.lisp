@@ -9,6 +9,7 @@
 
 (defstruct actor-struct
   (thread nil)
+  (name nil)
   (mail-box-cond (make-condition-variable))
   (mail-box (make-locked-object
               (make-queue :max-size +actor-mailbox-queue-size+))))
@@ -80,6 +81,13 @@ causing undefined behaviour."
 ;; This one holds all the actors in one big merry hash table.
 (defvar *actors* (make-locked-object (make-hash-table)))
 
+;; And this one holds names.
+(defvar *actor-names* (make-locked-object (make-hash-table)))
+
+;; Message holder actor.
+(defvar *message-holder-actor* nil)
+(defvar *message-holder-actor-lock* (make-lock))
+
 ;; NOTE: this function is not public. I can't come up with good reasons why
 ;; it should be.
 (defun push-actor-error (error-condition)
@@ -141,17 +149,45 @@ causing undefined behaviour."
 (define-condition too-many-messages (error)
   ((actor :initarg :actor :reader actor)))
 
-(defun make-actor (func &key (die-silently t))
+(define-condition name-exists (error)
+  ((name :initarg :name :reader name)
+   (offender :initarg :offender :reader offender)))
+
+(defun make-actor (func &key (die-silently t) (name nil))
   "Makes a new actor. It runs function FUNC inside the actor.
   If DIE-SILENTLY is true (the default), then any error inside func
   that is not caught is pushed into the error log instead of (possibly)
   going into the debugger. See function POP-ERROR-LOG for the error log stuff.
 
+  If NAME is not nil, then it the actor will have that name. Only one actor
+  with a specific name can exist. An error NAME-EXISTS will be raised if
+  you attempt to create an actor with the same name as an existing actor.
+  NAME can technically be any kind of value; it will be compared with EQL.
+  Be aware that it is captured so if it's the sort of value you might
+  modify, then the name may get modified inside the actor system as well.
+
   The purpose of dying \"silently\" is meant to provide fault tolerance.
   Dying actors send dying messages to linked actors that can then take
   some action, if desired.
-  
+
   Returns the actor. The actor may not necessarily be of any specific type."
+  (declare (type function func))
+
+  ;; If name is given, check that it is free and claim it as well.
+  (if name
+    (progn
+      (with-locked-object (names *actor-names*)
+        (awhen (gethash name names) (error 'name-exists
+                                           :name name
+                                           :offender it))
+        (setf (gethash name names) t))
+      (unwind-protect-if-fails
+          (make-actor-with-name func die-silently name)
+        (with-locked-object (names *actor-names*)
+          (remhash name names))))
+    (make-actor-with-name func die-silently nil)))
+
+(defun make-actor-with-name (func die-silently name)
   (declare (type function func))
 
   (let ((new-actor (make-actor-struct))
@@ -185,11 +221,20 @@ causing undefined behaviour."
                               (unless success?
                                 (push-actor-error error-condition))))
                           (t (call-func)))))
-                  (with-locked-object (actors *actors*)
-                    (remhash new-actor actors)))))))
+                  (progn
+                    (when name
+                      (with-locked-object (names *actor-names*)
+                        (remhash name names)))
+                    (with-locked-object (actors *actors*)
+                      (remhash new-actor actors))))))))
       (setf (actor-struct-thread new-actor) thr)
       (with-locked-object (actors *actors*)
         (setf (gethash new-actor actors) t))
+      (when name
+        (with-locked-object (names *actor-names*)
+          (assert (eq t (gethash name names)))
+          (setf (actor-struct-name new-actor) name)
+          (setf (gethash name names) new-actor)))
       (with-lock-held (cond-var-lock)
         (setq cond-var-go-ahead t)
         (condition-notify cond-var))
@@ -199,6 +244,17 @@ causing undefined behaviour."
   "Returns T if the actor pointed by ACTOR is dead."
   (with-locked-object (actors *actors*)
     (if (gethash actor actors) nil t)))
+
+(defun actor-name (actor)
+  "Returns the name of the actor ACTOR or NIL if the actor doesn't have a
+  name."
+  (actor-struct-name actor))
+
+(defun actor-by-name (name)
+  "Returns the actor pointed by NAME, or NIL if there's no actor with that
+  name."
+  (with-locked-object (names *actor-names*)
+    (values (gethash name names))))
 
 (defun actor-die (&optional (error-object nil error-object-supplied))
   "Makes the currently running actor die. It is an error to call this
@@ -232,7 +288,14 @@ causing undefined behaviour."
             (push thread result)))))
     result))
 
-(defun actor-send (object actor)
+(defun start-message-holder-actor ()
+  (with-lock-held (*message-holder-actor-lock*)
+    (when *message-holder-actor* (return-from start-message-holder-actor))
+
+    (setq *message-holder-actor* (make-actor #'messageholder
+                                             :die-silently nil))))
+
+(defun actor-send (object actor-or-name)
   "Sends a message to an actor. The actor code can use ACTOR-RECEIVE to
   receive it.
 
@@ -242,6 +305,15 @@ causing undefined behaviour."
   anything to the actor is a no-op, effective immediately when
   the limit is reached (even before the error is raised in the receiving
   actor).
+
+  If ACTOR is not an actor object, then it is assumed to be a name that
+  points to an actor. If there's no actor by that name, then the message is
+  queued for 60 seconds to wait until an actor of that name is created.
+  When such actor is created, it is not guaranteed that all the messages
+  arrive or that they arrive immediately. This behaviour merely makes such
+  occurrence less likely to happen.
+
+  If there's no actor by that name, this function does nothing.
 
   A message can be any Lisp object. It's probably for the best that you do
   not attempt to use the object after sending it away to avoid different
@@ -258,10 +330,18 @@ causing undefined behaviour."
   receiving actor.
 
   Always returns T. Even if the message wasn't sent or can't be received."
-  (with-locked-object (mail-box (actor-struct-mail-box actor))
-    (push-to-queue object mail-box)
-    (condition-notify (actor-struct-mail-box-cond actor))
-    t))
+  (if (actor-struct-p actor-or-name)
+    (with-locked-object (mail-box (actor-struct-mail-box actor-or-name))
+      (push-to-queue object mail-box)
+      (condition-notify (actor-struct-mail-box-cond actor-or-name)))
+    (let ((ac (actor-by-name actor-or-name)))
+      (if ac
+        (actor-send object ac)
+        (progn
+          (start-message-holder-actor)
+          (actor-send (cons actor-or-name object)
+                      *message-holder-actor*)))))
+  t)
 
 (defun actor-receive (&optional block timeout)
   "Returns an object that was sent to the actor with the use of ACTOR-SEND.

@@ -35,6 +35,15 @@
       (t (setf max-size-trigger t)
          nil))))
 
+(defun peek-from-queue (queue)
+  "Same as POP-FROM-QUEUE but doesn't remove the object from the queue nor
+  does this reset any max size triggers."
+  (with-slots ((front front)
+               (size size)) queue
+    (if (> size 0)
+      (values (car front) t)
+      (values nil nil))))
+
 (defun pop-from-queue (queue)
   "Takes one object from the queue and returns it. Returns two values:
   the object and T if there was an object in the queue and NIL if there
