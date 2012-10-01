@@ -7,6 +7,7 @@
     #:actor-send #:actor-receive
     #:actor-dead-p
     #:actor-name
+    #:actor-by-name
 
     #:die
 
@@ -16,6 +17,8 @@
     #:name
     #:offender
 
+    #:defactor
+
     #:pop-error-log #:error-log-max-size
     #:actor-die #:*actor-self*)
   (:documentation
@@ -24,5 +27,6 @@
 (defpackage #:m-actors.test
   (:use #:cl #:m-actors #:bordeaux-threads)
   (:export
-    #:ring-test))
+    #:ring-test
+    #:faulty-actor-test))
 

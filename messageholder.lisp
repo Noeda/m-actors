@@ -33,18 +33,29 @@ M-ACTORS:DIE is sent to the actor, the actor invokes ACTOR-DIE on itself."
                   (,msg-var (actor-receive t ,timeout-sym)))
              (when (equal ,msg-var 'die)
                (actor-die))
-             ,@body))))))
+             (setq ,state
+                   (block ,name   ; Lets users use return-from intuitively
+                          (progn ,@body)))))))))
 
 (defstruct messageholder
+  (first-time t)
   (names-to-queues (make-hash-table))
   (last-flush-time (now)))
 
 (defactor messageholder (make-messageholder) (payload holder 1.0)
+  ; There's a tiny chance of a race condition. If the messageholder mail
+  ; box is filled to maximum number of messages before we get here even
+  ; once then the message holder crashes.
+  (when (messageholder-first-time holder)
+    (setf (messageholder-first-time holder) nil)
+    (setf (actor-struct-dont-crash-on-mailbox-full *actor-self*) t))
+
   (when payload (queue-up payload holder))
   (with-slots ((lft last-flush-time)) holder
     (when (< (1+ lft) (now))
       (setf lft (now))
-      (flush-queues holder))))
+      (flush-queues holder)))
+  holder)
 
 (defun queue-up (payload holder)
   (with-slots ((queues names-to-queues)) holder
@@ -74,9 +85,9 @@ M-ACTORS:DIE is sent to the actor, the actor invokes ACTOR-DIE on itself."
               (progn
                 (if (actor-by-name name)
                   (let ((msg (pop-from-queue queue)))
-                    (actor-send msg name))
+                    (actor-send (car msg) name))
                   (progn
-                    (if (> (cdr msg) (now))
+                    (if (< (cdr msg) (now))
                       (pop-from-queue queue)
                       (return)))))
               (progn

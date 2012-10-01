@@ -11,5 +11,6 @@
                (:file "m-actors")
                (:file "messageholder")
 
-               (:file "m-actors-ring-test")))
+               (:file "m-actors-ring-test")
+               (:file "m-actors-faulty-actor-test")))
 

@@ -10,6 +10,7 @@
 (defstruct actor-struct
   (thread nil)
   (name nil)
+  (dont-crash-on-mailbox-full nil)
   (mail-box-cond (make-condition-variable))
   (mail-box (make-locked-object
               (make-queue :max-size +actor-mailbox-queue-size+))))
@@ -61,15 +62,18 @@ causing undefined behaviour."
                 (lambda ()
                   (loop
                     (sleep 1.0)
-                    (let ((now (now)))
+                    (let ((now (now))
+                          (notify-us))
                       (with-locked-object (pqueue
                                             *cond-notifier-pqueue*)
                         (loop while (and (not (pqueue-empty-p pqueue))
                                          (< (pqueue-front-key pqueue) now))
                               do
                           (let ((item (pqueue-pop pqueue)))
-                            (with-lock-held ((car item))
-                              (condition-notify (cdr item)))))))))))))
+                            (push item notify-us))))
+                      (dolist (n notify-us)
+                        (with-lock-held ((car n))
+                          (condition-notify (cdr n)))))))))))
     (with-locked-object (pqueue *cond-notifier-pqueue*)
       (pqueue-push (cons lock cond-var) (+ (now) timeout) pqueue))
     t))
@@ -379,7 +383,8 @@ causing undefined behaviour."
   (if block
     (actor-receive-blocking timeout)
     (with-locked-object (mail-box (actor-struct-mail-box *actor-self*))
-      (when (queue-max-size-trigger mail-box)
+      (when (and (queue-max-size-trigger mail-box)
+                 (not (actor-struct-dont-crash-on-mailbox-full *actor-self*)))
         (error 'too-many-messages :actor *actor-self*))
       (pop-from-queue mail-box))))
 
