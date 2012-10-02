@@ -79,6 +79,7 @@
                 (lambda ()
                   (loop for x from 1 upto 100 do
                     (actor-send x ac1))))))
+    (declare (ignorable ac2))
     (sleep 1.0)
     (actor-send 'die ac1)
     (is (not fail))
@@ -113,6 +114,7 @@
                 (lambda ()
                   (loop for x from 1 upto 100 do
                     (actor-send x 'mursu))))))
+    (declare (ignorable ac2))
     (sleep 1.0)
     (actor-send 'die ac1)
     (is (not fail))
@@ -134,4 +136,48 @@
 
     (sleep 3.0)
     (is (= incvalue 4950))))
+
+(deftest actor-die-really-kills-the-actor ()
+  (loop while (pop-error-log) do (progn))
+
+  (let ((ac (make-actor
+              (lambda ()
+                (loop do
+                  (let ((val (actor-receive t)))
+                    (when (eq val 'cookies)
+                      (actor-die))))))))
+    (is (member ac (list-all-actors)))
+    (is (not (actor-dead-p ac)))
+    (is (null (pop-error-log)))
+    (sleep 0.5)
+    (is (member ac (list-all-actors)))
+    (is (not (actor-dead-p ac)))
+    (is (null (pop-error-log)))
+    (actor-send 'teepee ac)
+    (sleep 0.5)
+    (is (member ac (list-all-actors)))
+    (is (not (actor-dead-p ac)))
+    (is (null (pop-error-log)))
+    (actor-send 'cookies ac)
+    (sleep 0.5)
+    (is (not (member ac (list-all-actors))))
+    (is (actor-dead-p ac))))
+    (is (null (pop-error-log)))
+
+(deftest cannot-make-two-actors-with-same-name ()
+  (make-actor (lambda () (sleep 2.0)) :name 'mushroom)
+  (is (handler-case (make-actor (lambda () (sleep 2.5)) :name 'mushroom)
+        (name-exists () t)
+        (error () nil)))
+  (sleep 3.0))
+
+(deftest sending-messages-to-nonsense-doesnt-crash ()
+  (actor-send (cons 'one 'two) 'three)
+  (actor-send (cons 'one 'two) 'threee)
+  (actor-send (cons 'one 'two) 17)
+  (actor-send (cons 'one 'two) (make-actor (lambda ())))
+  (actor-send 1929 1293139)
+  (actor-send #(777 999 000) #(100 100))
+  (actor-send "Hello" '(5 . 18))
+  (actor-send (make-actor (lambda ())) (make-actor (lambda ()))))
 
