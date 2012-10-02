@@ -8,35 +8,6 @@
 
 (in-package #:m-actors)
 
-(defmacro defactor (name initial-state
-                         (msg-var state-var &optional timeout)
-                         &body body)
-  "This is a helper macro for defining a common type of actors.
-
-Defines an actor function with the name NAME. INITIAL-STATE is a form that
-is evaluated when a new actor is created with the resulting actor function.
-MSG-VAR is a variable name that will hold the received message and
-STATE-VAR is a variable that will hold the state of the actor. If TIMEOUT
-is given, then, if no messages are received in the actor within the
-TIMEOUT, a NIL message is given. BODY lists the forms that are evaluated
-whenever a message arrives.
-
-When BODY returns, the return value is assigned as new state and then the
-actor returns to waiting a new message. As a convenience, if the symbol
-M-ACTORS:DIE is sent to the actor, the actor invokes ACTOR-DIE on itself."
-  (with-gensyms (state timeout-sym)
-    `(defun ,name ()
-       (let ((,state ,initial-state)
-             (,timeout-sym ,timeout))
-         (loop do
-           (let* ((,state-var ,state)
-                  (,msg-var (actor-receive t ,timeout-sym)))
-             (when (equal ,msg-var 'die)
-               (actor-die))
-             (setq ,state
-                   (block ,name   ; Lets users use return-from intuitively
-                          (progn ,@body)))))))))
-
 (defstruct messageholder
   (first-time t)
   (names-to-queues (make-hash-table))

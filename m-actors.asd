@@ -9,6 +9,7 @@
   :components ((:file "package")
                (:file "queue")
                (:file "m-actors")
+               (:file "convenience")
                (:file "messageholder")
 
                (:file "m-actors-ring-test")

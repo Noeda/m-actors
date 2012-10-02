@@ -17,7 +17,10 @@
     #:name
     #:offender
 
+    #:actor-lambda
     #:defactor
+    #:1-1-supervisor-lambda
+    #:define-1-1-supervisor
 
     #:pop-error-log #:error-log-max-size
     #:actor-die #:*actor-self*)
