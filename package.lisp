@@ -12,6 +12,7 @@
     #:die
 
     #:too-many-messages
+    #:not-in-actor
     #:name-exists
     #:actor
     #:name

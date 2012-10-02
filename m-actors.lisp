@@ -150,6 +150,8 @@ causing undefined behaviour."
                  :initarg :error-object
                  :reader error-object)))
 
+(define-condition not-in-actor (error) ())
+
 (define-condition too-many-messages (error)
   ((actor :initarg :actor :reader actor)))
 
@@ -369,13 +371,15 @@ causing undefined behaviour."
   It is an error to call this function outside actor code. An error will be
   raised if you try.
 
+  If you call this outside any actor code, NOT-IN-ACTOR condition is raised.
+
   It is possible for the actor to die during ACTOR-RECEIVE if the mailbox of
   the actor hit the maximum message limit. Depending on SILENTLY-DIE
   keyword parameter in MAKE-ACTOR and CL implementation, this may or may not
   fire a debugger."
 
   (unless *actor-self*
-    (error "ACTOR-RECEIVE must be called inside an actor."))
+    (error 'not-in-actor))
 
   (unless (or (null timeout)
               (realp timeout))
