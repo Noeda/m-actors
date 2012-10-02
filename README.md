@@ -26,11 +26,15 @@ tolerance. If one actor dies, the rest of the system can keep running. In
 pure actor model, different actors cannot share any data; only messages can
 be sent between them.
 
+Test cases
+----------
+The package M-ACTORS.TEST contains a function M-ACTORS that, when called,
+runs the test suite. Some other silly experiment tests are in that package
+as well.
+
 TODO
 ----
 - Supervision trees. Pilfer the concept from Erlang.
-- Test cases. Nobody knows if this library would crash and burn in
-  real environment.
 
 Author
 ======
