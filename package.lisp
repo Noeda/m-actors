@@ -29,8 +29,9 @@
     "See README.md"))
 
 (defpackage #:m-actors.test
-  (:use #:cl #:m-actors #:bordeaux-threads)
+  (:use #:cl #:m-actors #:bordeaux-threads #:stefil)
   (:export
     #:ring-test
-    #:faulty-actor-test))
+    #:faulty-actor-test
+    #:m-actors))
 

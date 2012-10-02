@@ -291,7 +291,10 @@ causing undefined behaviour."
           (multiple-value-bind (more? thread value) (generator)
             (declare (ignore value))
             (unless more? (return))
-            (push thread result)))))
+            ; We are so evil; we don't let them know we have one internal
+            ; actor
+            (unless (eq thread *message-holder-actor*)
+              (push thread result))))))
     result))
 
 (defun start-message-holder-actor ()
