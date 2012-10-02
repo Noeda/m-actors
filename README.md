@@ -32,6 +32,16 @@ The package M-ACTORS.TEST contains a function M-ACTORS that, when called,
 runs the test suite. Some other silly experiment tests are in that package
 as well.
 
+Tested CL implemenatations
+--------------------------
+
+SBCL (1.0.58) and Clozure CL (1.8) on Linux (64-bit) appear to work.
+Additionally, Clozure CL (1.8) on FreeBSD (32-bit) passes tests.
+
+CMU CL appears to fail some of the tests.
+
+Other implementations may or may not work. Try the test suite.
+
 TODO
 ----
 - Supervision trees. Pilfer the concept from Erlang.
