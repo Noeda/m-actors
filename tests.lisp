@@ -181,3 +181,18 @@
   (actor-send "Hello" '(5 . 18))
   (actor-send (make-actor (lambda ())) (make-actor (lambda ()))))
 
+(deftest actor-p-works ()
+  (is (not (actor-p 15)))
+  (is (not (actor-p (cons 'a 'b))))
+  (is (not (actor-p "jungle")))
+  (is (not (actor-p (lambda ()))))
+  (is (not (actor-p #(1 2 3 4))))
+  (is (not (actorp 15)))
+  (is (not (actorp (cons 'a 'b))))
+  (is (not (actorp "jungle")))
+  (is (not (actorp (lambda ()))))
+  (is (not (actorp #(1 2 3 4))))
+  (is (actorp (make-actor (lambda ()))))
+  (sleep 0.5))
+
+

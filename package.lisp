@@ -5,6 +5,8 @@
   (:export
     #:make-actor #:list-all-actors
     #:actor-send #:actor-receive
+    #:actorp
+    #:actor-p
     #:actor-dead-p
     #:actor-name
     #:actor-by-name

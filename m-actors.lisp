@@ -15,6 +15,14 @@
   (mail-box (make-locked-object
               (make-queue :max-size +actor-mailbox-queue-size+))))
 
+(defun actor-p (object)
+  "Returns T if OBJECT is an actor. Otherwise NIL."
+  (actor-struct-p object))
+
+(defun actorp (object)
+  "Returns T if OBJECT is an actor. Otherwise NIL."
+  (actor-p object))
+
 ;; In the some cases you need the lock that is usually private
 ;; within the closure created by MAKE-LOCKED-OBJECT. It is bound to this
 ;; special variable whenever a lock is made.
